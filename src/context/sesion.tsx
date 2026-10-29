@@ -10,7 +10,9 @@ import {
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
+  reload,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
@@ -24,6 +26,7 @@ import { auth } from '@/config/firebase';
 type ValorSesion = {
   /** Usuario conectado, o null si nadie ha iniciado sesión. */
   usuario: User | null;
+  correoVerificado: boolean;
   /** Nombre del perfil (displayName), siempre actualizado tras el registro. */
   nombre: string | null;
   /** true mientras Firebase revisa si hay una sesión guardada. */
@@ -31,6 +34,8 @@ type ValorSesion = {
   iniciarSesion: (correo: string, clave: string) => Promise<void>;
   registrarse: (nombre: string, correo: string, clave: string) => Promise<void>;
   enviarCorreoRecuperacion: (correo: string) => Promise<void>;
+  reenviarCorreoVerificacion: () => Promise<void>;
+  actualizarVerificacionCorreo: () => Promise<boolean>;
   cambiarClave: (claveActual: string, claveNueva: string) => Promise<void>;
   cerrarSesion: () => Promise<void>;
 };
@@ -49,6 +54,7 @@ export function useSesion(): ValorSesion {
  
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<User | null>(null);
+  const [correoVerificado, setCorreoVerificado] = useState(false);
   const [cargando, setCargando] = useState(true);
   // Nombre del perfil guardado aparte: updateProfile modifica el mismo objeto
   // `user` sin cambiar su referencia, así que React no detectaría el cambio
@@ -58,9 +64,11 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(() => {
     // onAuthStateChanged se dispara al arrancar (con la sesión guardada o null)
     // y cada vez que alguien inicia o cierra sesión. Es la fuente de verdad:
-    // la navegación (Stack.Protected en _layout.tsx) depende de este estado.
+    // la navegación (Stack.Protected en _layout.tsx) depende de este estado
+    // y de que el correo del usuario esté verificado.
     const cancelarSuscripcion = onAuthStateChanged(auth, (usuarioFirebase) => {
       setUsuario(usuarioFirebase);
+      setCorreoVerificado(usuarioFirebase?.emailVerified ?? false);
       setNombre(usuarioFirebase?.displayName ?? null);
       setCargando(false);
     });
@@ -77,6 +85,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   async function registrarse(nombreCompleto: string, correo: string, clave: string) {
     // Crear la cuenta también inicia la sesión.
     const credencial = await createUserWithEmailAndPassword(auth, correo.trim(), clave);
+    await sendEmailVerification(credencial.user);
     // Guardamos el nombre en el perfil de Firebase (campo displayName).
     const nombreLimpio = nombreCompleto.trim();
     await updateProfile(credencial.user, { displayName: nombreLimpio });
@@ -90,6 +99,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     // Si el correo no existe, por la protección de enumeración NO lanza error:
     // por eso la pantalla muestra un mensaje neutro.
     await sendPasswordResetEmail(auth, correo.trim());
+  }
+
+  async function reenviarCorreoVerificacion() {
+    const actual = auth.currentUser;
+    if (!actual) throw new Error('No hay una sesión activa.');
+    await sendEmailVerification(actual);
+  }
+
+  async function actualizarVerificacionCorreo(): Promise<boolean> {
+    const actual = auth.currentUser;
+    if (!actual) throw new Error('No hay una sesión activa.');
+    await reload(actual);
+    setCorreoVerificado(actual.emailVerified);
+    return actual.emailVerified;
   }
  
   async function cambiarClave(claveActual: string, claveNueva: string) {
@@ -112,11 +135,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     <ContextoSesion
       value={{
         usuario,
+        correoVerificado,
         nombre,
         cargando,
         iniciarSesion,
         registrarse,
         enviarCorreoRecuperacion,
+        reenviarCorreoVerificacion,
+        actualizarVerificacionCorreo,
         cambiarClave,
         cerrarSesion,
       }}>

@@ -5,7 +5,7 @@
  *   1. Cargar las fuentes.
  *   2. Envolver la app en el ProveedorSesion (para que todas las pantallas
  *      conozcan al usuario).
- *   3. Decidir qué pantallas existen según haya o no sesión (Stack.Protected).
+ *   3. Decidir qué pantallas existen según la sesión y el correo verificado.
  *   4. Mantener visible la pantalla de carga (splash) hasta tener todo listo.
  */
 import { BigShoulders_800ExtraBold } from '@expo-google-fonts/big-shoulders';
@@ -47,7 +47,7 @@ export default function LayoutRaiz() {
  * ProveedorSesion, y LayoutRaiz es justamente quien lo crea.
  */
 function Navegacion({ fuentesListas }: { fuentesListas: boolean }) {
-  const { usuario, cargando } = useSesion();
+  const { usuario, correoVerificado, cargando } = useSesion();
   const listo = fuentesListas && !cargando;
  
   useEffect(() => {
@@ -71,7 +71,7 @@ function Navegacion({ fuentesListas }: { fuentesListas: boolean }) {
         sesión estando en la bienvenida), Expo Router lo lleva a la primera
         ruta disponible. Así no hace falta escribir redirecciones a mano.
       */}
-      <Stack.Protected guard={!!usuario}>
+      <Stack.Protected guard={!!usuario && correoVerificado}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
  
@@ -79,6 +79,10 @@ function Navegacion({ fuentesListas }: { fuentesListas: boolean }) {
         <Stack.Screen name="login" />
         <Stack.Screen name="registro" />
         <Stack.Screen name="recuperar" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={!!usuario && !correoVerificado}>
+        <Stack.Screen name="verificar-correo" />
       </Stack.Protected>
     </Stack>
   );

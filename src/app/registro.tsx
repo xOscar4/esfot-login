@@ -53,7 +53,7 @@ export default function PantallaRegistro() {
     setEnviando(true);
     try {
       await registrarse(nombre, correo, clave);
-      // Al crear la cuenta Firebase inicia sesión y el layout muestra la bienvenida.
+      // La cuenta queda iniciada, pero el layout exige verificar el correo.
     } catch (error) {
       setErrorGeneral(mensajeDeError(error));
       setEnviando(false);

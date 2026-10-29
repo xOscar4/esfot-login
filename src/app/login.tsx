@@ -4,6 +4,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
  
 import { Aviso } from '@/components/aviso';
 import { Boton } from '@/components/boton';
@@ -23,6 +29,10 @@ export default function PantallaLogin() {
   const [errores, setErrores] = useState<{ correo?: string | null; clave?: string | null }>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const desplazamientoError = useSharedValue(0);
+  const estiloSacudida = useAnimatedStyle(() => ({
+    transform: [{ translateX: desplazamientoError.get() }],
+  }));
  
   async function manejarIngreso() {
     // 1. Validamos en el teléfono antes de llamar a Firebase.
@@ -40,6 +50,13 @@ export default function PantallaLogin() {
       await iniciarSesion(correo, clave);
     } catch (error) {
       setErrorGeneral(mensajeDeError(error));
+      desplazamientoError.set(withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(-8, { duration: 50 }),
+        withTiming(8, { duration: 50 }),
+        withTiming(0, { duration: 50 }),
+      ));
       // finally no sirve aquí para todo: si el ingreso funciona, esta pantalla
       // se desmonta y no debemos actualizar su estado.
       setEnviando(false);
@@ -51,7 +68,11 @@ export default function PantallaLogin() {
       antetitulo="ESFOT, Escuela Politécnica Nacional"
       titulo={'Inicia\nsesión'}
       bajada="Ingresa con el correo y la contraseña de tu cuenta.">
-      {errorGeneral ? <Aviso tipo="error" mensaje={errorGeneral} /> : null}
+      {errorGeneral ? (
+        <Animated.View style={estiloSacudida}>
+          <Aviso tipo="error" mensaje={errorGeneral} />
+        </Animated.View>
+      ) : null}
  
       <CampoTexto
         etiqueta="Correo"
